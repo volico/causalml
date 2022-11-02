@@ -4,10 +4,11 @@
 # cython: language_level=3
 # cython: linetrace=True
 
-from sklearn.tree._criterion cimport RegressionCriterion
+from ._criterion cimport RegressionCriterion
 from sklearn.tree._criterion cimport SIZE_t, DOUBLE_t
 from libc.string cimport memset
 from libc.string cimport memcpy
+from libc.math cimport fabs
 
 
 cdef struct NodeInfo:
@@ -379,3 +380,69 @@ cdef class CausalMSE(CausalRegressionCriterion):
                            left_tau * left_tau
         impurity_right[0] = (right_tr_var / self.state.right.tr_count + right_ct_var / self.state.right.ct_count) - \
                             right_tau * right_tau
+
+cdef class TTestCriteria(CausalRegressionCriterion):
+    """
+    Mean squared error impurity criterion for Causal Tree
+    CausalTreeMSE = right_effect + left_effect
+    where,
+    effect = alpha * tau^2 - (1 - alpha) * (1 + train_to_est_ratio) * (VAR_tr / p + VAR_cont / (1 - p))
+    """
+
+    cdef double node_impurity(self) nogil:
+        """
+        Evaluate the impurity of the current node, i.e. the impurity of samples[start:end].
+        """
+        cdef double impurity
+        cdef double node_tau
+        cdef double tr_var
+        cdef double ct_var
+
+
+        node_tau = self.get_tau(self.state.node)
+        tr_var = self.get_variance(
+            self.state.node.tr_y_sum,
+            self.state.node.tr_y_sq_sum,
+            self.state.node.tr_count
+        )
+        ct_var = self.get_variance(
+            self.state.node.ct_y_sum,
+            self.state.node.ct_y_sq_sum,
+            self.state.node.ct_count)
+        impurity = node_tau/(((tr_var/self.state.node.tr_count) + (ct_var/self.state.node.ct_count))**(1/2))
+        impurity = -1*fabs(impurity)
+
+        return impurity
+
+    cdef double get_tau(self, NodeInfo info) nogil:
+        return info.tr_y_sum / info.tr_count - info.ct_y_sum / info.ct_count
+
+    cdef double get_variance(self, double y_sum, double y_sq_sum, double count) nogil:
+        return  y_sq_sum / count - (y_sum * y_sum) / (count * count)
+
+    cdef void children_impurity(self, double * impurity_left, double * impurity_right) nogil:
+        """
+        Evaluate the impurity in children nodes, i.e. the impurity of the
+           left child (samples[start:pos]) and the impurity the right child
+           (samples[pos:end]).
+        """
+
+        cdef double right_tr_var
+        cdef double right_ct_var
+        cdef double left_tr_var
+        cdef double left_ct_var
+
+        right_tau = self.get_tau(self.state.right)
+        right_tr_var = self.get_variance(
+            self.state.right.tr_y_sum , self.state.right.tr_y_sq_sum, self.state.right.tr_count)
+        right_ct_var = self.get_variance(
+            self.state.right.ct_y_sum, self.state.right.ct_y_sq_sum, self.state.right.ct_count)
+
+        left_tau = self.get_tau(self.state.left)
+        left_tr_var = self.get_variance(
+            self.state.left.tr_y_sum , self.state.left.tr_y_sq_sum, self.state.left.tr_count)
+        left_ct_var = self.get_variance(
+            self.state.left.ct_y_sum, self.state.left.ct_y_sq_sum, self.state.left.ct_count)
+
+        impurity_left[0] = -1*fabs(left_tau/(((left_tr_var/self.state.left.tr_count) + (left_ct_var/self.state.left.ct_count))**(1/2)))
+        impurity_right[0] = -1*fabs(right_tau/(((right_tr_var/self.state.right.tr_count) + (right_ct_var/self.state.right.ct_count))**(1/2)))

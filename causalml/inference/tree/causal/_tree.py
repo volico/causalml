@@ -10,14 +10,14 @@ from sklearn.tree._classes import DTYPE, DOUBLE
 from sklearn.tree._classes import SPARSE_SPLITTERS, DENSE_SPLITTERS
 from sklearn.tree._classes import Tree, BaseDecisionTree
 from sklearn.tree._classes import issparse, check_random_state
-from sklearn.tree._criterion import Criterion
+from ._criterion import Criterion
 from sklearn.tree._splitter import Splitter
 from sklearn.utils.validation import _check_sample_weight
 
 from .builder import DepthFirstCausalTreeBuilder
-from .criterion import StandardMSE, CausalMSE
+from .criterion import StandardMSE, CausalMSE, TTestCriteria
 
-CAUSAL_TREES_CRITERIA = {"causal_mse": CausalMSE, "standard_mse": StandardMSE}
+CAUSAL_TREES_CRITERIA = {"causal_mse": CausalMSE, "standard_mse": StandardMSE, "t_test": TTestCriteria}
 CRITERIA_REG.update(CAUSAL_TREES_CRITERIA)
 
 
