@@ -4,7 +4,7 @@
 # cython: language_level=3
 # cython: linetrace=True
 
-from ._criterion cimport RegressionCriterion
+from sklearn.tree._criterion cimport RegressionCriterion
 from sklearn.tree._criterion cimport SIZE_t, DOUBLE_t
 from libc.string cimport memset
 from libc.string cimport memcpy
@@ -227,6 +227,31 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
         # Save the average of treatment effects within a node as a value for the node
         dest[0] = self.state.node.tr_y_sum / self.state.node.tr_count - \
                   self.state.node.ct_y_sum / self.state.node.ct_count
+
+    cdef double impurity_improvement(self, double impurity_parent,
+                                     double impurity_left,
+                                     double impurity_right) nogil:
+        """Compute the improvement in impurity.
+        This method computes the improvement in impurity when a split occurs.
+        The weighted impurity improvement equation is the following:
+            N_t / N * (impurity - N_t_R / N_t * right_impurity
+                                - N_t_L / N_t * left_impurity)
+        where N is the total number of samples, N_t is the number of samples
+        at the current node, N_t_L is the number of samples in the left child,
+        and N_t_R is the number of samples in the right child,
+        Parameters
+        ----------
+        impurity_parent : double
+            The initial impurity of the parent node before the split
+        impurity_left : double
+            The impurity of the left child
+        impurity_right : double
+            The impurity of the right child
+        Return
+        ------
+        double : improvement in impurity after the split occurs
+        """
+        return impurity_right-impurity_left
 
 
 cdef class StandardMSE(CausalRegressionCriterion):

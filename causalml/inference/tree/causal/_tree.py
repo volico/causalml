@@ -10,7 +10,7 @@ from sklearn.tree._classes import DTYPE, DOUBLE
 from sklearn.tree._classes import SPARSE_SPLITTERS, DENSE_SPLITTERS
 from sklearn.tree._classes import Tree, BaseDecisionTree
 from sklearn.tree._classes import issparse, check_random_state
-from ._criterion import Criterion
+from sklearn.tree._criterion import Criterion
 from sklearn.tree._splitter import Splitter
 from sklearn.utils.validation import _check_sample_weight
 
