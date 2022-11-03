@@ -54,7 +54,7 @@ extensions = [
         libraries=[],
         include_dirs=[np_get_include()],
         extra_compile_args=["-O3"],
-    )
+    ),
 ]
 
 packages = find_packages(exclude=["tests", "tests.*"])
