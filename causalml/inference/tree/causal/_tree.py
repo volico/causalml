@@ -17,7 +17,11 @@ from sklearn.utils.validation import _check_sample_weight
 from .builder import DepthFirstCausalTreeBuilder
 from .criterion import StandardMSE, CausalMSE, TTest
 
-CAUSAL_TREES_CRITERIA = {"causal_mse": CausalMSE, "standard_mse": StandardMSE, "t_test": TTest}
+CAUSAL_TREES_CRITERIA = {
+    "causal_mse": CausalMSE,
+    "standard_mse": StandardMSE,
+    "t_test": TTest,
+}
 CRITERIA_REG.update(CAUSAL_TREES_CRITERIA)
 
 
