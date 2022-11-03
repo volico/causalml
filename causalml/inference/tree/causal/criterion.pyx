@@ -8,6 +8,7 @@ from sklearn.tree._criterion cimport RegressionCriterion
 from sklearn.tree._criterion cimport SIZE_t, DOUBLE_t
 from libc.string cimport memset
 from libc.string cimport memcpy
+from libc.math cimport pow
 
 
 cdef struct NodeInfo:
@@ -19,6 +20,8 @@ cdef struct NodeInfo:
     double y_sq_sum     # the squared sum of outcomes
     double tr_y_sq_sum  # the squared sum of outcomes among treatment obs
     double ct_y_sq_sum  # the squared sum of outcomes among control obs
+
+    double split_metric # Additional split metric
 
 
 cdef struct SplitState:
@@ -61,9 +64,9 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
         memset(&self.sum_total[0], 0, self.n_outputs * sizeof(double))
         self.sq_sum_total = 0.
         self.eps = 1e-5
-        self.state.node = [0., 0., 0., 0., 0., 0., 0., 0.]
-        self.state.left = [0., 0., 0., 0., 0., 0., 0., 0.]
-        self.state.right = [0., 0., 0., 0., 0., 0., 0., 0.]
+        self.state.node = [0., 0., 0., 0., 0., 0., 0., 0., 0.]
+        self.state.left = [0., 0., 0., 0., 0., 0., 0., 0., 0]
+        self.state.right = [0., 0., 0., 0., 0., 0., 0., 0., 0]
 
         for p in range(start, end):
             i = samples[p]
@@ -379,3 +382,58 @@ cdef class CausalMSE(CausalRegressionCriterion):
                            left_tau * left_tau
         impurity_right[0] = (right_tr_var / self.state.right.tr_count + right_ct_var / self.state.right.ct_count) - \
                             right_tau * right_tau
+
+
+cdef class TTest(CausalRegressionCriterion):
+
+    cdef double node_impurity(self) nogil:
+        """
+        Evaluate the impurity of the current node, i.e. the impurity of samples[start:end].
+        """
+        self.state.node.split_metric = self.state.left.split_metric + self.state.right.split_metric
+        return self.state.node.split_metric
+
+    cdef double get_tau(self, NodeInfo info) nogil:
+        return info.tr_y_sum / info.tr_count - info.ct_y_sum / info.ct_count
+
+    cdef double get_variance(self, double y_sum, double y_sq_sum, double count) nogil:
+        return  y_sq_sum / count - (y_sum * y_sum) / (count * count)
+
+    cdef void children_impurity(self, double * impurity_left, double * impurity_right) nogil:
+        """
+        Evaluate the impurity in children nodes, i.e. the impurity of the
+           left child (samples[start:pos]) and the impurity the right child
+           (samples[pos:end]).
+        """
+        cdef double right_tr_var
+        cdef double right_ct_var
+        cdef double left_tr_var
+        cdef double left_ct_var
+        cdef double tau_sq_diff
+        cdef double t_stat
+
+        right_tau = self.get_tau(self.state.right)
+        right_var = self.get_variance(
+            self.state.right.ct_y_sum + self.state.right.tr_y_sum,
+            self.state.right.ct_y_sq_sum + self.state.right.tr_y_sq_sum,
+            self.state.right.count)
+
+        left_tau = self.get_tau(self.state.left)
+        left_var = self.get_variance(
+            self.state.left.ct_y_sum + self.state.left.tr_y_sum,
+            self.state.left.ct_y_sq_sum + self.state.left.tr_y_sq_sum, self.state.left.count)
+
+        tau_sq_diff = pow((left_tau - right_tau), 2)
+        t_stat = tau_sq_diff/ (left_var/self.state.left.count + right_var/self.state.right.count)
+        t_stat = t_stat * (self.state.left.count + self.state.right.count)
+        t_stat = 1./t_stat
+
+        impurity_left[0] = t_stat
+        impurity_right[0] = t_stat
+        self.state.left.split_metric = t_stat
+        self.state.right.split_metric = t_stat
+
+    cdef double impurity_improvement(self, double impurity_parent,
+                                     double impurity_left,
+                                     double impurity_right) nogil:
+        return impurity_parent - (impurity_left + impurity_right)
