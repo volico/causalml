@@ -9,6 +9,7 @@ from sklearn.tree._criterion cimport SIZE_t, DOUBLE_t
 from libc.string cimport memset
 from libc.string cimport memcpy
 from libc.math cimport pow
+from libc.stdio cimport printf
 
 
 cdef struct NodeInfo:
@@ -64,9 +65,9 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
         memset(&self.sum_total[0], 0, self.n_outputs * sizeof(double))
         self.sq_sum_total = 0.
         self.eps = 1e-5
-        self.state.node = [0., 0., 0., 0., 0., 0., 0., 0., 0.]
-        self.state.left = [0., 0., 0., 0., 0., 0., 0., 0., 0]
-        self.state.right = [0., 0., 0., 0., 0., 0., 0., 0., 0]
+        self.state.node = [0., 0., 0., 0., 0., 0., 0., 0., 1.]
+        self.state.left = [0., 0., 0., 0., 0., 0., 0., 0., 1.]
+        self.state.right = [0., 0., 0., 0., 0., 0., 0., 0., 1.]
 
         for p in range(start, end):
             i = samples[p]
@@ -390,7 +391,7 @@ cdef class TTest(CausalRegressionCriterion):
         """
         Evaluate the impurity of the current node, i.e. the impurity of samples[start:end].
         """
-        self.state.node.split_metric = self.state.left.split_metric + self.state.right.split_metric
+        self.state.node.split_metric = self.state.left.split_metric
         return self.state.node.split_metric
 
     cdef double get_tau(self, NodeInfo info) nogil:
@@ -426,7 +427,7 @@ cdef class TTest(CausalRegressionCriterion):
         tau_sq_diff = pow((left_tau - right_tau), 2)
         t_stat = tau_sq_diff/ (left_var/self.state.left.count + right_var/self.state.right.count)
         t_stat = t_stat * (self.state.left.count + self.state.right.count)
-        t_stat = 1./t_stat
+        t_stat = -1. * t_stat
 
         impurity_left[0] = t_stat
         impurity_right[0] = t_stat
@@ -436,4 +437,4 @@ cdef class TTest(CausalRegressionCriterion):
     cdef double impurity_improvement(self, double impurity_parent,
                                      double impurity_left,
                                      double impurity_right) nogil:
-        return impurity_parent - (impurity_left + impurity_right)
+        return impurity_parent - impurity_left
