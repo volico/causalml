@@ -391,7 +391,7 @@ cdef class TTest(CausalRegressionCriterion):
         """
         Evaluate the impurity of the current node, i.e. the impurity of samples[start:end].
         """
-        self.state.node.split_metric = self.state.left.split_metric
+        self.state.node.split_metric = self.state.left.split_metric + self.state.right.split_metric
         return self.state.node.split_metric
 
     cdef double get_tau(self, NodeInfo info) nogil:
@@ -437,4 +437,4 @@ cdef class TTest(CausalRegressionCriterion):
     cdef double impurity_improvement(self, double impurity_parent,
                                      double impurity_left,
                                      double impurity_right) nogil:
-        return impurity_parent - impurity_left
+        return impurity_parent - (impurity_left + impurity_right)
